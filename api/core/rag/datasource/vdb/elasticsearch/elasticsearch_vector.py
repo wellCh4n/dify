@@ -61,7 +61,7 @@ class ElasticSearchVector(BaseVector):
                 retry_on_timeout=True,
                 max_retries=10000,
             )
-            print('############################', client.cluster.info())
+            print('############################', client.cluster.health())
         except requests.exceptions.ConnectionError:
             raise ConnectionError("Vector database connection error")
 
