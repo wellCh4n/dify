@@ -620,6 +620,7 @@ services:
       - network.bind_host=0.0.0.0
     ports:
       - ${ELASTICSEARCH_PORT:-9200}:9200
+    command: [service, elasticsearch, start]
     healthcheck:
       test: ["CMD", "curl", "-s", "http://localhost:9200/_cluster/health?pretty"]
       interval: 30s
