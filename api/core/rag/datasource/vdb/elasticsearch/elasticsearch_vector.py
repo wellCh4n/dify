@@ -48,10 +48,12 @@ class ElasticSearchVector(BaseVector):
     def _init_client(self, config: ElasticSearchConfig) -> Elasticsearch:
         try:
             parsed_url = urlparse(config.host)
+            print('#############', parsed_url)
             if parsed_url.scheme in ['http', 'https']:
                 hosts = f'{config.host}:{config.port}'
             else:
                 hosts = f'http://{config.host}:{config.port}'
+            print('#############', hosts)
             client = Elasticsearch(
                 hosts=hosts,
                 basic_auth=(config.username, config.password),
