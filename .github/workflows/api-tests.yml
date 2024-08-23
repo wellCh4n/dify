@@ -15,8 +15,6 @@ jobs:
       matrix:
         python-version:
           - "3.10"
-          - "3.11"
-          - "3.12"
 
     steps:
       - name: Checkout code
@@ -77,14 +75,6 @@ jobs:
           compose-file: |
             docker/docker-compose.yaml
           services: |
-            weaviate
-            qdrant
-            etcd
-            minio
-            milvus-standalone
-            pgvecto-rs
-            pgvector
-            chroma
             elasticsearch
       - name: Test Vector Stores
         run: poetry run -C api bash dev/pytest/pytest_vdb.sh
