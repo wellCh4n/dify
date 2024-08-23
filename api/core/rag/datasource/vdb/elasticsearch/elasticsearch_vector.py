@@ -168,6 +168,7 @@ class ElasticSearchVector(BaseVector):
                 logger.info(f"Collection {self._collection_name.lower()} already exists.")
                 return
 
+            print('##############' + requests.get('http://localhost:9200').text)
             if not self._client.indices.exists(index=self._collection_name.lower()):
                 dim = len(embeddings[0])
                 mappings = {
