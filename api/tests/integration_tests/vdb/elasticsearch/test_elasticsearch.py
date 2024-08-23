@@ -12,7 +12,7 @@ class ElasticSearchVectorTest(AbstractVectorTest):
         self.vector = ElasticSearchVector(
             index_name=self.collection_name.lower(),
             config=ElasticSearchConfig(
-                host='http://localhost',
+                host='http://elasticsearch',
                 port='9200',
                 username='elastic',
                 password='elastic'
