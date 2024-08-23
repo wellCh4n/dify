@@ -53,7 +53,7 @@ class ElasticSearchVector(BaseVector):
                 hosts = f'{config.host}:{config.port}'
             else:
                 hosts = f'http://{config.host}:{config.port}'
-            print('#############', hosts)
+            print('#############', hosts, config.username, config.password)
             client = Elasticsearch(
                 hosts=hosts,
                 basic_auth=(config.username, config.password),
