@@ -26,10 +26,9 @@ const translation = {
   appDeleteFailed: 'アプリの削除に失敗しました',
   join: 'コミュニティに参加する',
   communityIntro:
-    'さまざまなチャンネルでチームメンバーや貢献者、開発者と議論します。',
+  'さまざまなチャンネルでチームメンバーや貢献者、開発者と議論します。',
   roadmap: 'ロードマップを見る',
   newApp: {
-    // this comment is to recreate PR
     startFromBlank: '最初から作成',
     startFromTemplate: 'テンプレートから作成',
     captionAppType: 'どのタイプのアプリを作成しますか？',
@@ -48,7 +47,7 @@ const translation = {
     advancedFor: '上級ユーザー向け',
     advancedDescription: 'ワークフロー オーケストレートは、ワークフロー形式でチャットボットをオーケストレートし、組み込みのプロンプトを編集する機能を含む高度なカスタマイズを提供します。経験豊富なユーザー向けです。',
     captionName: 'アプリのアイコンと名前',
-    appNamePlaceholder: 'アプリに名前を付ける',
+    appNamePlaceholder: 'アプリ名を入力してください',
     captionDescription: '説明',
     appDescriptionPlaceholder: 'アプリの説明を入力してください',
     useTemplate: 'このテンプレートを使用する',
@@ -165,6 +164,10 @@ const translation = {
       title: 'オピック',
       description: 'Opik は、LLM アプリケーションを評価、テスト、監視するためのオープンソース プラットフォームです。',
     },
+    weave: {
+      description: 'Weaveは、LLMアプリケーションを評価、テスト、および監視するためのオープンソースプラットフォームです。',
+      title: '織る',
+    },
   },
   answerIcon: {
     title: 'Webアプリアイコンを使用して🤖を置き換える',
@@ -194,6 +197,17 @@ const translation = {
     params: 'アプリパラメータ',
     noParams: 'パラメータは必要ありません',
     placeholder: 'アプリを選択...',
+  },
+  structOutput: {
+    moreFillTip: '最大10レベルのネストを表示します',
+    required: '必須',
+    LLMResponse: 'LLMのレスポンス',
+    configure: '設定',
+    notConfiguredTip: '構造化出力が未設定です',
+    structured: '構造化出力',
+    structuredTip: '構造化出力は、モデルが常に指定されたJSONスキーマに準拠した応答を生成することを保証する機能です。',
+    modelNotSupported: 'モデルが対応していません',
+    modelNotSupportedTip: '現在のモデルはこの機能に対応しておらず、自動的にプロンプトインジェクションに切り替わります。',
   },
 }
 

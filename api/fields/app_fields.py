@@ -1,4 +1,4 @@
-from flask_restful import fields  # type: ignore
+from flask_restful import fields
 
 from fields.workflow_fields import workflow_partial_fields
 from libs.helper import AppIconUrlField, TimestampField
@@ -204,6 +204,7 @@ app_import_fields = {
     "id": fields.String,
     "status": fields.String,
     "app_id": fields.String,
+    "app_mode": fields.String,
     "current_dsl_version": fields.String,
     "imported_dsl_version": fields.String,
     "error": fields.String,

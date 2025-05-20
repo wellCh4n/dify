@@ -1,4 +1,10 @@
 const translation = {
+  theme: {
+    theme: '主题',
+    light: '浅色',
+    dark: '深色',
+    auto: '自动',
+  },
   api: {
     success: '成功',
     actionSuccess: '操作成功',
@@ -27,6 +33,8 @@ const translation = {
     lineBreak: '换行',
     sure: '我确定',
     download: '下载',
+    downloadSuccess: '下载完毕',
+    downloadFailed: '下载失败，请稍后重试。',
     viewDetails: '查看详情',
     delete: '删除',
     deleteApp: '删除应用',
@@ -54,6 +62,8 @@ const translation = {
     regenerate: '重新生成',
     submit: '提交',
     skip: '跳过',
+    format: '格式化',
+    more: '更多',
   },
   errorMsg: {
     fieldRequired: '{{field}} 为必填项',
@@ -152,11 +162,22 @@ const translation = {
     workspace: '工作空间',
     createWorkspace: '创建工作空间',
     helpCenter: '帮助文档',
+    support: '支持',
+    compliance: '合规',
     communityFeedback: '用户反馈',
     roadmap: '路线图',
+    github: 'GitHub',
     community: '社区',
     about: '关于',
     logout: '登出',
+  },
+  compliance: {
+    soc2Type1: 'SOC 2 Type I Report',
+    soc2Type2: 'SOC 2 Type II Report',
+    iso27001: 'ISO 27001:2022 Certification',
+    gdpr: 'GDPR DPA',
+    sandboxUpgradeTooltip: '仅适用于 Professional 或 Team 版计划。',
+    professionalUpgradeTooltip: '仅适用于 Team 版计划或以上。',
   },
   settings: {
     accountGroup: '通用',
@@ -205,6 +226,9 @@ const translation = {
     feedbackTitle: '反馈',
     feedbackLabel: '请告诉我们您为什么删除账户？',
     feedbackPlaceholder: '选填',
+    editWorkspaceInfo: '编辑工作空间信息',
+    workspaceName: '工作空间名称',
+    workspaceIcon: '工作空间图标',
   },
   members: {
     team: '团队',
@@ -458,7 +482,7 @@ const translation = {
   apiBasedExtension: {
     title: 'API 扩展提供了一个集中式的 API 管理，在此统一添加 API 配置后，方便在 Dify 上的各类应用中直接使用。',
     link: '了解如何开发您自己的 API 扩展。',
-    linkUrl: 'https://docs.dify.ai/v/zh-hans/guides/extension/api-based-extension',
+    linkUrl: 'https://docs.dify.ai/zh-hans/guides/extension/api-based-extension',
     add: '新增 API 扩展',
     selector: {
       title: 'API 扩展',
@@ -546,6 +570,7 @@ const translation = {
     inputPlaceholder: '和机器人聊天',
     thinking: '深度思考中...',
     thought: '已深度思考',
+    resend: '重新发送',
   },
   promptEditor: {
     placeholder: '在这里写你的提示词，输入\'{\' 插入变量、输入\'/\' 插入提示内容块',
@@ -635,6 +660,11 @@ const translation = {
   },
   pagination: {
     perPage: '每页显示',
+  },
+  imageInput: {
+    dropImageHere: '将图片拖放到此处，或',
+    browse: '浏览',
+    supportedFormats: '支持PNG、JPG、JPEG、WEBP和GIF格式',
   },
 }
 

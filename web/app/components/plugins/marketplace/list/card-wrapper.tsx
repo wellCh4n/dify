@@ -1,4 +1,5 @@
 'use client'
+import { useTheme } from 'next-themes'
 import { RiArrowRightUpLine } from '@remixicon/react'
 import { getPluginLinkInMarketplace } from '../utils'
 import Card from '@/app/components/plugins/card'
@@ -22,6 +23,7 @@ const CardWrapper = ({
   locale,
 }: CardWrapperProps) => {
   const { t } = useMixedTranslation(locale)
+  const { theme } = useTheme()
   const [isShowInstallFromMarketplace, {
     setTrue: showInstallFromMarketplace,
     setFalse: hideInstallFromMarketplace,
@@ -32,7 +34,7 @@ const CardWrapper = ({
   if (showInstallButton) {
     return (
       <div
-        className='group relative rounded-xl cursor-pointer  hover:bg-components-panel-on-panel-item-bg-hover'
+        className='group relative cursor-pointer rounded-xl  hover:bg-components-panel-on-panel-item-bg-hover'
       >
         <Card
           key={plugin.name}
@@ -46,30 +48,28 @@ const CardWrapper = ({
           }
         />
         {
-          showInstallButton && (
-            <div className='hidden absolute bottom-0 group-hover:flex items-center space-x-2 px-4 pt-8 pb-4 w-full bg-gradient-to-tr from-components-panel-on-panel-item-bg to-background-gradient-mask-transparent rounded-b-xl'>
+          <div className='absolute bottom-0 hidden w-full items-center space-x-2 rounded-b-xl bg-gradient-to-tr from-components-panel-on-panel-item-bg to-background-gradient-mask-transparent px-4 pb-4 pt-8 group-hover:flex'>
+            <Button
+              variant='primary'
+              className='w-[calc(50%-4px)]'
+              onClick={showInstallFromMarketplace}
+            >
+              {t('plugin.detailPanel.operation.install')}
+            </Button>
+            <a href={`${getPluginLinkInMarketplace(plugin)}?language=${localeFromLocale}${theme ? `&theme=${theme}` : ''}`} target='_blank' className='block w-[calc(50%-4px)] flex-1 shrink-0'>
               <Button
-                variant='primary'
-                className='w-[calc(50%-4px)]'
-                onClick={showInstallFromMarketplace}
+                className='w-full gap-0.5'
               >
-                {t('plugin.detailPanel.operation.install')}
+                {t('plugin.detailPanel.operation.detail')}
+                <RiArrowRightUpLine className='ml-1 h-4 w-4' />
               </Button>
-              <a href={`${getPluginLinkInMarketplace(plugin)}?language=${localeFromLocale}`} target='_blank' className='block flex-1 shrink-0 w-[calc(50%-4px)]'>
-                <Button
-                  className='w-full gap-0.5'
-                >
-                  {t('plugin.detailPanel.operation.detail')}
-                  <RiArrowRightUpLine className='ml-1 w-4 h-4' />
-                </Button>
-              </a>
-            </div>
-          )
+            </a>
+          </div>
         }
         {
           isShowInstallFromMarketplace && (
             <InstallFromMarketplace
-              manifest={plugin as any}
+              manifest={plugin}
               uniqueIdentifier={plugin.latest_package_identifier}
               onClose={hideInstallFromMarketplace}
               onSuccess={hideInstallFromMarketplace}
@@ -82,7 +82,7 @@ const CardWrapper = ({
 
   return (
     <a
-      className='group inline-block relative rounded-xl cursor-pointer'
+      className='group relative inline-block cursor-pointer rounded-xl'
       href={getPluginLinkInMarketplace(plugin)}
     >
       <Card

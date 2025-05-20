@@ -32,7 +32,7 @@ from core.tools.errors import (
 from core.tools.utils.message_transformer import ToolFileMessageTransformer
 from core.tools.workflow_as_tool.tool import WorkflowTool
 from extensions.ext_database import db
-from models.enums import CreatedByRole
+from models.enums import CreatorUserRole
 from models.model import Message, MessageFile
 
 
@@ -246,10 +246,11 @@ class ToolEngine:
                     + "you do not need to create it, just tell the user to check it now."
                 )
             elif response.type == ToolInvokeMessage.MessageType.JSON:
-                text = json.dumps(cast(ToolInvokeMessage.JsonMessage, response.message).json_object, ensure_ascii=False)
-                result += f"tool response: {text}."
+                result += json.dumps(
+                    cast(ToolInvokeMessage.JsonMessage, response.message).json_object, ensure_ascii=False
+                )
             else:
-                result += f"tool response: {response.message!r}."
+                result += str(response.message)
 
         return result
 
@@ -289,14 +290,16 @@ class ToolEngine:
                     raise ValueError("missing meta data")
 
                 yield ToolInvokeMessageBinary(
-                    mimetype=response.meta.get("mime_type", "octet/stream"),
+                    mimetype=response.meta.get("mime_type", "application/octet-stream"),
                     url=cast(ToolInvokeMessage.TextMessage, response.message).text,
                 )
             elif response.type == ToolInvokeMessage.MessageType.LINK:
                 # check if there is a mime type in meta
                 if response.meta and "mime_type" in response.meta:
                     yield ToolInvokeMessageBinary(
-                        mimetype=response.meta.get("mime_type", "octet/stream") if response.meta else "octet/stream",
+                        mimetype=response.meta.get("mime_type", "application/octet-stream")
+                        if response.meta
+                        else "application/octet-stream",
                         url=cast(ToolInvokeMessage.TextMessage, response.message).text,
                     )
 
@@ -310,7 +313,6 @@ class ToolEngine:
         """
         Create message file
 
-        :param messages: messages
         :return: message file ids
         """
         result = []
@@ -337,9 +339,9 @@ class ToolEngine:
                 url=message.url,
                 upload_file_id=tool_file_id,
                 created_by_role=(
-                    CreatedByRole.ACCOUNT
+                    CreatorUserRole.ACCOUNT
                     if invoke_from in {InvokeFrom.EXPLORE, InvokeFrom.DEBUGGER}
-                    else CreatedByRole.END_USER
+                    else CreatorUserRole.END_USER
                 ),
                 created_by=user_id,
             )

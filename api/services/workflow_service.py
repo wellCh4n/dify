@@ -5,13 +5,15 @@ from datetime import UTC, datetime
 from typing import Any, Optional
 from uuid import uuid4
 
-from sqlalchemy import desc
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from core.app.apps.advanced_chat.app_config_manager import AdvancedChatAppConfigManager
 from core.app.apps.workflow.app_config_manager import WorkflowAppConfigManager
-from core.model_runtime.utils.encoders import jsonable_encoder
+from core.repositories import SQLAlchemyWorkflowNodeExecutionRepository
 from core.variables import Variable
 from core.workflow.entities.node_entities import NodeRunResult
+from core.workflow.entities.node_execution_entities import NodeExecution, NodeExecutionStatus
 from core.workflow.errors import WorkflowNodeRunFailedError
 from core.workflow.graph_engine.entities.event import InNodeEvent
 from core.workflow.nodes import NodeType
@@ -24,8 +26,8 @@ from core.workflow.workflow_entry import WorkflowEntry
 from events.app_event import app_draft_workflow_was_synced, app_published_workflow_was_updated
 from extensions.ext_database import db
 from models.account import Account
-from models.enums import CreatedByRole
 from models.model import App, AppMode
+from models.tools import WorkflowToolProvider
 from models.workflow import (
     Workflow,
     WorkflowNodeExecution,
@@ -35,6 +37,8 @@ from models.workflow import (
 )
 from services.errors.app import WorkflowHashNotEqualError
 from services.workflow.workflow_converter import WorkflowConverter
+
+from .errors.workflow_service import DraftWorkflowDeletionError, WorkflowInUseError
 
 
 class WorkflowService:
@@ -79,21 +83,37 @@ class WorkflowService:
 
         return workflow
 
-    def get_all_published_workflow(self, app_model: App, page: int, limit: int) -> tuple[list[Workflow], bool]:
+    def get_all_published_workflow(
+        self,
+        *,
+        session: Session,
+        app_model: App,
+        page: int,
+        limit: int,
+        user_id: str | None,
+        named_only: bool = False,
+    ) -> tuple[Sequence[Workflow], bool]:
         """
         Get published workflow with pagination
         """
         if not app_model.workflow_id:
             return [], False
 
-        workflows = (
-            db.session.query(Workflow)
-            .filter(Workflow.app_id == app_model.id)
-            .order_by(desc(Workflow.version))
-            .offset((page - 1) * limit)
+        stmt = (
+            select(Workflow)
+            .where(Workflow.app_id == app_model.id)
+            .order_by(Workflow.version.desc())
             .limit(limit + 1)
-            .all()
+            .offset((page - 1) * limit)
         )
+
+        if user_id:
+            stmt = stmt.where(Workflow.created_by == user_id)
+
+        if named_only:
+            stmt = stmt.where(Workflow.marked_name != "")
+
+        workflows = session.scalars(stmt).all()
 
         has_more = len(workflows) > limit
         if has_more:
@@ -157,23 +177,26 @@ class WorkflowService:
         # return draft workflow
         return workflow
 
-    def publish_workflow(self, app_model: App, account: Account, draft_workflow: Optional[Workflow] = None) -> Workflow:
-        """
-        Publish workflow from draft
-
-        :param app_model: App instance
-        :param account: Account instance
-        :param draft_workflow: Workflow instance
-        """
-        if not draft_workflow:
-            # fetch draft workflow by app_model
-            draft_workflow = self.get_draft_workflow(app_model=app_model)
-
+    def publish_workflow(
+        self,
+        *,
+        session: Session,
+        app_model: App,
+        account: Account,
+        marked_name: str = "",
+        marked_comment: str = "",
+    ) -> Workflow:
+        draft_workflow_stmt = select(Workflow).where(
+            Workflow.tenant_id == app_model.tenant_id,
+            Workflow.app_id == app_model.id,
+            Workflow.version == "draft",
+        )
+        draft_workflow = session.scalar(draft_workflow_stmt)
         if not draft_workflow:
             raise ValueError("No valid workflow found.")
 
         # create new workflow
-        workflow = Workflow(
+        workflow = Workflow.new(
             tenant_id=app_model.tenant_id,
             app_id=app_model.id,
             type=draft_workflow.type,
@@ -183,15 +206,12 @@ class WorkflowService:
             created_by=account.id,
             environment_variables=draft_workflow.environment_variables,
             conversation_variables=draft_workflow.conversation_variables,
+            marked_name=marked_name,
+            marked_comment=marked_comment,
         )
 
         # commit db session changes
-        db.session.add(workflow)
-        db.session.flush()
-        db.session.commit()
-
-        app_model.workflow_id = workflow.id
-        db.session.commit()
+        session.add(workflow)
 
         # trigger app workflow events
         app_published_workflow_was_updated.send(app_model, published_workflow=workflow)
@@ -247,30 +267,37 @@ class WorkflowService:
         # run draft workflow node
         start_at = time.perf_counter()
 
-        workflow_node_execution = self._handle_node_run_result(
-            getter=lambda: WorkflowEntry.single_step_run(
+        node_execution = self._handle_node_run_result(
+            invoke_node_fn=lambda: WorkflowEntry.single_step_run(
                 workflow=draft_workflow,
                 node_id=node_id,
                 user_inputs=user_inputs,
                 user_id=account.id,
             ),
             start_at=start_at,
-            tenant_id=app_model.tenant_id,
             node_id=node_id,
         )
 
-        workflow_node_execution.app_id = app_model.id
-        workflow_node_execution.created_by = account.id
-        workflow_node_execution.workflow_id = draft_workflow.id
+        # Set workflow_id on the NodeExecution
+        node_execution.workflow_id = draft_workflow.id
 
-        db.session.add(workflow_node_execution)
-        db.session.commit()
+        # Create repository and save the node execution
+        repository = SQLAlchemyWorkflowNodeExecutionRepository(
+            session_factory=db.engine,
+            user=account,
+            app_id=app_model.id,
+            triggered_from=WorkflowNodeExecutionTriggeredFrom.SINGLE_STEP,
+        )
+        repository.save(node_execution)
+
+        # Convert node_execution to WorkflowNodeExecution after save
+        workflow_node_execution = repository.to_db_model(node_execution)
 
         return workflow_node_execution
 
     def run_free_workflow_node(
         self, node_data: dict, tenant_id: str, user_id: str, node_id: str, user_inputs: dict[str, Any]
-    ) -> WorkflowNodeExecution:
+    ) -> NodeExecution:
         """
         Run draft workflow node
         """
@@ -278,7 +305,7 @@ class WorkflowService:
         start_at = time.perf_counter()
 
         workflow_node_execution = self._handle_node_run_result(
-            getter=lambda: WorkflowEntry.run_free_node(
+            invoke_node_fn=lambda: WorkflowEntry.run_free_node(
                 node_id=node_id,
                 node_data=node_data,
                 tenant_id=tenant_id,
@@ -286,7 +313,6 @@ class WorkflowService:
                 user_inputs=user_inputs,
             ),
             start_at=start_at,
-            tenant_id=tenant_id,
             node_id=node_id,
         )
 
@@ -294,21 +320,12 @@ class WorkflowService:
 
     def _handle_node_run_result(
         self,
-        getter: Callable[[], tuple[BaseNode, Generator[NodeEvent | InNodeEvent, None, None]]],
+        invoke_node_fn: Callable[[], tuple[BaseNode, Generator[NodeEvent | InNodeEvent, None, None]]],
         start_at: float,
-        tenant_id: str,
         node_id: str,
-    ) -> WorkflowNodeExecution:
-        """
-        Handle node run result
-
-        :param getter: Callable[[], tuple[BaseNode, Generator[RunEvent | InNodeEvent, None, None]]]
-        :param start_at: float
-        :param tenant_id: str
-        :param node_id: str
-        """
+    ) -> NodeExecution:
         try:
-            node_instance, generator = getter()
+            node_instance, generator = invoke_node_fn()
 
             node_run_result: NodeRunResult | None = None
             for event in generator:
@@ -357,20 +374,21 @@ class WorkflowService:
             node_run_result = None
             error = e.error
 
-        workflow_node_execution = WorkflowNodeExecution()
-        workflow_node_execution.id = str(uuid4())
-        workflow_node_execution.tenant_id = tenant_id
-        workflow_node_execution.triggered_from = WorkflowNodeExecutionTriggeredFrom.SINGLE_STEP.value
-        workflow_node_execution.index = 1
-        workflow_node_execution.node_id = node_id
-        workflow_node_execution.node_type = node_instance.node_type
-        workflow_node_execution.title = node_instance.node_data.title
-        workflow_node_execution.elapsed_time = time.perf_counter() - start_at
-        workflow_node_execution.created_by_role = CreatedByRole.ACCOUNT.value
-        workflow_node_execution.created_at = datetime.now(UTC).replace(tzinfo=None)
-        workflow_node_execution.finished_at = datetime.now(UTC).replace(tzinfo=None)
+        # Create a NodeExecution domain model
+        node_execution = NodeExecution(
+            id=str(uuid4()),
+            workflow_id="",  # This is a single-step execution, so no workflow ID
+            index=1,
+            node_id=node_id,
+            node_type=node_instance.node_type,
+            title=node_instance.node_data.title,
+            elapsed_time=time.perf_counter() - start_at,
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            finished_at=datetime.now(UTC).replace(tzinfo=None),
+        )
+
         if run_succeeded and node_run_result:
-            # create workflow node execution
+            # Set inputs, process_data, and outputs as dictionaries (not JSON strings)
             inputs = WorkflowEntry.handle_special_values(node_run_result.inputs) if node_run_result.inputs else None
             process_data = (
                 WorkflowEntry.handle_special_values(node_run_result.process_data)
@@ -379,23 +397,23 @@ class WorkflowService:
             )
             outputs = WorkflowEntry.handle_special_values(node_run_result.outputs) if node_run_result.outputs else None
 
-            workflow_node_execution.inputs = json.dumps(inputs)
-            workflow_node_execution.process_data = json.dumps(process_data)
-            workflow_node_execution.outputs = json.dumps(outputs)
-            workflow_node_execution.execution_metadata = (
-                json.dumps(jsonable_encoder(node_run_result.metadata)) if node_run_result.metadata else None
-            )
-            if node_run_result.status == WorkflowNodeExecutionStatus.SUCCEEDED:
-                workflow_node_execution.status = WorkflowNodeExecutionStatus.SUCCEEDED.value
-            elif node_run_result.status == WorkflowNodeExecutionStatus.EXCEPTION:
-                workflow_node_execution.status = WorkflowNodeExecutionStatus.EXCEPTION.value
-                workflow_node_execution.error = node_run_result.error
-        else:
-            # create workflow node execution
-            workflow_node_execution.status = WorkflowNodeExecutionStatus.FAILED.value
-            workflow_node_execution.error = error
+            node_execution.inputs = inputs
+            node_execution.process_data = process_data
+            node_execution.outputs = outputs
+            node_execution.metadata = node_run_result.metadata
 
-        return workflow_node_execution
+            # Map status from WorkflowNodeExecutionStatus to NodeExecutionStatus
+            if node_run_result.status == WorkflowNodeExecutionStatus.SUCCEEDED:
+                node_execution.status = NodeExecutionStatus.SUCCEEDED
+            elif node_run_result.status == WorkflowNodeExecutionStatus.EXCEPTION:
+                node_execution.status = NodeExecutionStatus.EXCEPTION
+                node_execution.error = node_run_result.error
+        else:
+            # Set failed status and error
+            node_execution.status = NodeExecutionStatus.FAILED
+            node_execution.error = error
+
+        return node_execution
 
     def convert_to_workflow(self, app_model: App, account: Account, args: dict) -> App:
         """
@@ -436,3 +454,81 @@ class WorkflowService:
             )
         else:
             raise ValueError(f"Invalid app mode: {app_model.mode}")
+
+    def update_workflow(
+        self, *, session: Session, workflow_id: str, tenant_id: str, account_id: str, data: dict
+    ) -> Optional[Workflow]:
+        """
+        Update workflow attributes
+
+        :param session: SQLAlchemy database session
+        :param workflow_id: Workflow ID
+        :param tenant_id: Tenant ID
+        :param account_id: Account ID (for permission check)
+        :param data: Dictionary containing fields to update
+        :return: Updated workflow or None if not found
+        """
+        stmt = select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+        workflow = session.scalar(stmt)
+
+        if not workflow:
+            return None
+
+        allowed_fields = ["marked_name", "marked_comment"]
+
+        for field, value in data.items():
+            if field in allowed_fields:
+                setattr(workflow, field, value)
+
+        workflow.updated_by = account_id
+        workflow.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+        return workflow
+
+    def delete_workflow(self, *, session: Session, workflow_id: str, tenant_id: str) -> bool:
+        """
+        Delete a workflow
+
+        :param session: SQLAlchemy database session
+        :param workflow_id: Workflow ID
+        :param tenant_id: Tenant ID
+        :return: True if successful
+        :raises: ValueError if workflow not found
+        :raises: WorkflowInUseError if workflow is in use
+        :raises: DraftWorkflowDeletionError if workflow is a draft version
+        """
+        stmt = select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+        workflow = session.scalar(stmt)
+
+        if not workflow:
+            raise ValueError(f"Workflow with ID {workflow_id} not found")
+
+        # Check if workflow is a draft version
+        if workflow.version == "draft":
+            raise DraftWorkflowDeletionError("Cannot delete draft workflow versions")
+
+        # Check if this workflow is currently referenced by an app
+        stmt = select(App).where(App.workflow_id == workflow_id)
+        app = session.scalar(stmt)
+        if app:
+            # Cannot delete a workflow that's currently in use by an app
+            raise WorkflowInUseError(f"Cannot delete workflow that is currently in use by app '{app.name}'")
+
+        # Don't use workflow.tool_published as it's not accurate for specific workflow versions
+        # Check if there's a tool provider using this specific workflow version
+        tool_provider = (
+            session.query(WorkflowToolProvider)
+            .filter(
+                WorkflowToolProvider.tenant_id == workflow.tenant_id,
+                WorkflowToolProvider.app_id == workflow.app_id,
+                WorkflowToolProvider.version == workflow.version,
+            )
+            .first()
+        )
+
+        if tool_provider:
+            # Cannot delete a workflow that's published as a tool
+            raise WorkflowInUseError("Cannot delete workflow that is published as a tool")
+
+        session.delete(workflow)
+        return True

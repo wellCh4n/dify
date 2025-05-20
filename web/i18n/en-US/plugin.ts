@@ -1,4 +1,7 @@
 const translation = {
+  metadata: {
+    title: 'Plugins',
+  },
   category: {
     all: 'All',
     models: 'Models',
@@ -194,6 +197,8 @@ const translation = {
       firstReleased: 'First Released',
     },
     viewMore: 'View more',
+    verifiedTip: 'Verified by Dify',
+    partnerTip: 'Verified by a Dify partner',
   },
   task: {
     installing: 'Installing {{installingLength}} plugins, 0 done.',
@@ -204,6 +209,7 @@ const translation = {
     clearAll: 'Clear all',
   },
   submitPlugin: 'Submit plugin',
+  difyVersionNotCompatible: 'The current Dify version is not compatible with this plugin, please upgrade to the minimum version required: {{minimalDifyVersion}}',
 }
 
 export default translation

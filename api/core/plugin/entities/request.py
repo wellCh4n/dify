@@ -55,8 +55,8 @@ class RequestInvokeLLM(BaseRequestInvokeModel):
     mode: str
     completion_params: dict[str, Any] = Field(default_factory=dict)
     prompt_messages: list[PromptMessage] = Field(default_factory=list)
-    tools: Optional[list[PromptMessageTool]] = Field(default_factory=list)
-    stop: Optional[list[str]] = Field(default_factory=list)
+    tools: Optional[list[PromptMessageTool]] = Field(default_factory=list[PromptMessageTool])
+    stop: Optional[list[str]] = Field(default_factory=list[str])
     stream: Optional[bool] = False
 
     model_config = ConfigDict(protected_namespaces=())
@@ -204,3 +204,11 @@ class RequestRequestUploadFile(BaseModel):
 
     filename: str
     mimetype: str
+
+
+class RequestFetchAppInfo(BaseModel):
+    """
+    Request to fetch app info
+    """
+
+    app_id: str

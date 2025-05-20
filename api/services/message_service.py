@@ -15,7 +15,6 @@ from libs.infinite_scroll_pagination import InfiniteScrollPagination
 from models.account import Account
 from models.model import App, AppMode, AppModelConfig, EndUser, Message, MessageFeedback
 from services.conversation_service import ConversationService
-from services.errors.conversation import ConversationCompletedError, ConversationNotExistsError
 from services.errors.message import (
     FirstMessageNotExistsError,
     LastMessageNotExistsError,
@@ -179,6 +178,21 @@ class MessageService:
         return feedback
 
     @classmethod
+    def get_all_messages_feedbacks(cls, app_model: App, page: int, limit: int):
+        """Get all feedbacks of an app"""
+        offset = (page - 1) * limit
+        feedbacks = (
+            db.session.query(MessageFeedback)
+            .filter(MessageFeedback.app_id == app_model.id)
+            .order_by(MessageFeedback.created_at.desc(), MessageFeedback.id.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
+        return [record.to_dict() for record in feedbacks]
+
+    @classmethod
     def get_message(cls, app_model: App, user: Optional[Union[Account, EndUser]], message_id: str):
         message = (
             db.session.query(Message)
@@ -209,12 +223,6 @@ class MessageService:
         conversation = ConversationService.get_conversation(
             app_model=app_model, conversation_id=message.conversation_id, user=user
         )
-
-        if not conversation:
-            raise ConversationNotExistsError()
-
-        if conversation.status != "normal":
-            raise ConversationCompletedError()
 
         model_manager = ModelManager()
 

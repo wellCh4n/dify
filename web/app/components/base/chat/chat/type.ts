@@ -4,13 +4,13 @@ import type { FileEntity } from '@/app/components/base/file-uploader/types'
 import type { InputVarType } from '@/app/components/workflow/types'
 import type { FileResponse } from '@/types/workflow'
 
-export interface MessageMore {
+export type MessageMore = {
   time: string
   tokens: number
   latency: number | string
 }
 
-export interface FeedbackType {
+export type FeedbackType = {
   rating: MessageRating
   content?: string | null
 }
@@ -26,7 +26,7 @@ export type SubmitAnnotationFunc = (
 
 export type DisplayScene = 'web' | 'console'
 
-export interface ToolInfoInThought {
+export type ToolInfoInThought = {
   name: string
   label: string
   input: string
@@ -34,20 +34,21 @@ export interface ToolInfoInThought {
   isFinished: boolean
 }
 
-export interface ThoughtItem {
+export type ThoughtItem = {
   id: string
   tool: string // plugin or dataset. May has multi.
   thought: string
   tool_input: string
   tool_labels?: { [key: string]: TypeWithI18N }
   message_id: string
+  conversation_id: string
   observation: string
   position: number
   files?: string[]
   message_files?: FileEntity[]
 }
 
-export interface CitationItem {
+export type CitationItem = {
   content: string
   data_source_type: string
   dataset_name: string
@@ -62,7 +63,7 @@ export interface CitationItem {
   word_count: number
 }
 
-export interface IChatItem {
+export type IChatItem = {
   id: string
   content: string
   citation?: CitationItem[]
@@ -104,7 +105,7 @@ export interface IChatItem {
   nextSibling?: string
 }
 
-export interface Metadata {
+export type Metadata = {
   retriever_resources?: CitationItem[]
   annotation_reply: {
     id: string
@@ -115,20 +116,20 @@ export interface Metadata {
   }
 }
 
-export interface MessageEnd {
+export type MessageEnd = {
   id: string
   metadata: Metadata
   files?: FileResponse[]
 }
 
-export interface MessageReplace {
+export type MessageReplace = {
   id: string
   task_id: string
   answer: string
   conversation_id: string
 }
 
-export interface AnnotationReply {
+export type AnnotationReply = {
   id: string
   task_id: string
   answer: string
@@ -137,7 +138,7 @@ export interface AnnotationReply {
   annotation_author_name: string
 }
 
-export interface InputForm {
+export type InputForm = {
   type: InputVarType
   label: string
   variable: any

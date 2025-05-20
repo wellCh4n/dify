@@ -1,4 +1,4 @@
-from flask_restful import fields  # type: ignore
+from flask_restful import fields
 
 from libs.helper import TimestampField
 
@@ -39,10 +39,4 @@ segment_fields = {
     "error": fields.String,
     "stopped_at": TimestampField,
     "child_chunks": fields.List(fields.Nested(child_chunk_fields)),
-}
-
-segment_list_response = {
-    "data": fields.List(fields.Nested(segment_fields)),
-    "has_more": fields.Boolean,
-    "limit": fields.Integer,
 }
