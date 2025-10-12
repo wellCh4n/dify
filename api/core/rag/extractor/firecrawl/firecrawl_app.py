@@ -2,7 +2,7 @@ import json
 import time
 from typing import Any, cast
 
-import requests
+import httpx
 
 from extensions.ext_storage import storage
 
@@ -49,7 +49,6 @@ class FirecrawlApp:
             return cast(str, job_id)
         else:
             self._handle_error(response, "start crawl job")
-            # FIXME: unreachable code for mypy
             return ""  # unreachable
 
     def check_crawl_status(self, job_id) -> dict[str, Any]:
@@ -82,7 +81,6 @@ class FirecrawlApp:
                 )
         else:
             self._handle_error(response, "check crawl status")
-            # FIXME: unreachable code for mypy
             return {}  # unreachable
 
     def _format_crawl_status_response(
@@ -106,24 +104,50 @@ class FirecrawlApp:
     def _prepare_headers(self) -> dict[str, Any]:
         return {"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"}
 
-    def _post_request(self, url, data, headers, retries=3, backoff_factor=0.5) -> requests.Response:
+    def _post_request(self, url, data, headers, retries=3, backoff_factor=0.5) -> httpx.Response:
         for attempt in range(retries):
-            response = requests.post(url, headers=headers, json=data)
+            response = httpx.post(url, headers=headers, json=data)
             if response.status_code == 502:
                 time.sleep(backoff_factor * (2**attempt))
             else:
                 return response
         return response
 
-    def _get_request(self, url, headers, retries=3, backoff_factor=0.5) -> requests.Response:
+    def _get_request(self, url, headers, retries=3, backoff_factor=0.5) -> httpx.Response:
         for attempt in range(retries):
-            response = requests.get(url, headers=headers)
+            response = httpx.get(url, headers=headers)
             if response.status_code == 502:
                 time.sleep(backoff_factor * (2**attempt))
             else:
                 return response
         return response
 
-    def _handle_error(self, response, action) -> None:
+    def _handle_error(self, response, action):
         error_message = response.json().get("error", "Unknown error occurred")
-        raise Exception(f"Failed to {action}. Status code: {response.status_code}. Error: {error_message}")
+        raise Exception(f"Failed to {action}. Status code: {response.status_code}. Error: {error_message}")  # type: ignore[return]
+
+    def search(self, query: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        # Documentation: https://docs.firecrawl.dev/api-reference/endpoint/search
+        headers = self._prepare_headers()
+        json_data = {
+            "query": query,
+            "limit": 5,
+            "lang": "en",
+            "country": "us",
+            "timeout": 60000,
+            "ignoreInvalidURLs": False,
+            "scrapeOptions": {},
+        }
+        if params:
+            json_data.update(params)
+        response = self._post_request(f"{self.base_url}/v1/search", json_data, headers)
+        if response.status_code == 200:
+            response_data = response.json()
+            if not response_data.get("success"):
+                raise Exception(f"Search failed. Error: {response_data.get('warning', 'Unknown error')}")
+            return cast(dict[str, Any], response_data)
+        elif response.status_code in {402, 409, 500, 429, 408}:
+            self._handle_error(response, "perform search")
+            return {}  # Avoid additional exception after handling error
+        else:
+            raise Exception(f"Failed to perform search. Status code: {response.status_code}")

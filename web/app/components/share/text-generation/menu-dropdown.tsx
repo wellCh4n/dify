@@ -1,32 +1,42 @@
 'use client'
 import type { FC } from 'react'
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Placement } from '@floating-ui/react'
 import {
   RiEqualizer2Line,
 } from '@remixicon/react'
+import { usePathname, useRouter } from 'next/navigation'
+import Divider from '../../base/divider'
+import InfoModal from './info-modal'
 import ActionButton from '@/app/components/base/action-button'
 import {
   PortalToFollowElem,
   PortalToFollowElemContent,
   PortalToFollowElemTrigger,
 } from '@/app/components/base/portal-to-follow-elem'
-import Divider from '@/app/components/base/divider'
 import ThemeSwitcher from '@/app/components/base/theme-switcher'
-import InfoModal from './info-modal'
 import type { SiteInfo } from '@/models/share'
 import cn from '@/utils/classnames'
+import { AccessMode } from '@/models/access-control'
+import { useWebAppStore } from '@/context/web-app-context'
 
 type Props = {
   data?: SiteInfo
   placement?: Placement
+  hideLogout?: boolean
+  forceClose?: boolean
 }
 
 const MenuDropdown: FC<Props> = ({
   data,
   placement,
+  hideLogout,
+  forceClose,
 }) => {
+  const webAppAccessMode = useWebAppStore(s => s.webAppAccessMode)
+  const router = useRouter()
+  const pathname = usePathname()
   const { t } = useTranslation()
   const [open, doSetOpen] = useState(false)
   const openRef = useRef(open)
@@ -39,7 +49,18 @@ const MenuDropdown: FC<Props> = ({
     setOpen(!openRef.current)
   }, [setOpen])
 
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('webapp_access_token')
+    router.replace(`/webapp-signin?redirect_url=${pathname}`)
+  }, [router, pathname])
+
   const [show, setShow] = useState(false)
+
+  useEffect(() => {
+    if (forceClose)
+      setOpen(false)
+  }, [forceClose, setOpen])
 
   return (
     <>
@@ -64,7 +85,7 @@ const MenuDropdown: FC<Props> = ({
             <div className='p-1'>
               <div className={cn('system-md-regular flex cursor-pointer items-center rounded-lg py-1.5 pl-3 pr-2 text-text-secondary')}>
                 <div className='grow'>{t('common.theme.theme')}</div>
-                <ThemeSwitcher/>
+                <ThemeSwitcher />
               </div>
             </div>
             <Divider type='horizontal' className='my-0' />
@@ -82,6 +103,16 @@ const MenuDropdown: FC<Props> = ({
                 className='system-md-regular cursor-pointer rounded-lg px-3 py-1.5 text-text-secondary hover:bg-state-base-hover'
               >{t('common.userProfile.about')}</div>
             </div>
+            {!(hideLogout || webAppAccessMode === AccessMode.EXTERNAL_MEMBERS || webAppAccessMode === AccessMode.PUBLIC) && (
+              <div className='p-1'>
+                <div
+                  onClick={handleLogout}
+                  className='system-md-regular cursor-pointer rounded-lg px-3 py-1.5 text-text-secondary hover:bg-state-base-hover'
+                >
+                  {t('common.userProfile.logout')}
+                </div>
+              </div>
+            )}
           </div>
         </PortalToFollowElemContent>
       </PortalToFollowElem>

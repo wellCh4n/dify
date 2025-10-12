@@ -18,9 +18,8 @@ def test_firecrawl_web_extractor_crawl_mode(mocker):
     mocked_firecrawl = {
         "id": "test",
     }
-    mocker.patch("requests.post", return_value=_mock_response(mocked_firecrawl))
+    mocker.patch("httpx.post", return_value=_mock_response(mocked_firecrawl))
     job_id = firecrawl_app.crawl_url(url, params)
-    print(f"job_id: {job_id}")
 
     assert job_id is not None
     assert isinstance(job_id, str)
